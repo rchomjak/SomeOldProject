@@ -154,9 +154,7 @@ function pathCSV_notspec_read_file {
 
 	done < "$file_path" 
 
-
 	IFS=$OLD_IFS
-
 }
 
 function pathCSV_spec_read_file {
@@ -170,9 +168,7 @@ function pathCSV_spec_read_file {
 
 	done < "$file_path" 
 
-
 	IFS=$OLD_IFS
-
 }
 
 ##
