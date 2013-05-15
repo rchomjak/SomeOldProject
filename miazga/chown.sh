@@ -77,28 +77,17 @@ function check_params {
 
 	if [ $help_flag = "on" ] ; then
 
-                if [ $file_flag = "on" ] ; then
-
-                        enum_string E_BPAR; exit $(enum_error E_BPAR)
-
-
-                elif [ $ver_flag = "on" ] ; then
+                if [ $file_flag = "on" ] || [ $ver_flag = "on" ] ; then
 
                         enum_string E_BPAR; exit $(enum_error E_BPAR)
                 fi;
 
                 enum_string E_PHELP; exit $(enum_error E_OK)
-
         fi;
 
         if [ $ver_flag = "on" ] ; then
 
-                if  [ $file_flag = "on" ] ; then
-
-                        enum_string E_BPAR; exit $(enum_error E_BPAR)
-
-
-                elif [ $help_flag = "on" ] ; then
+                if  [ $file_flag = "on" ] || [ $help_flag = "on"  ]  ; then
 
                         enum_string E_BPAR; exit $(enum_error E_BPAR)
                 fi;
@@ -111,9 +100,7 @@ function check_params {
 		if [ ! -f "$file_path" ] && [ ! -r "$file_path" ] ; then
 
 			enum_string E_FILE; exit $(enum_error E_FILE)
-
 		fi;
-
 	fi;
 	
 	if [ $path_flag = "on" ] && [ $file_flag = "off" ] ; then
