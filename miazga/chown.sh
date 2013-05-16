@@ -1,13 +1,13 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash 
 
 #Name:		chown.sh
 #Author: 	knajt, zic.spse(AT)gmail.com
 #Date: 		2013
-#Version: 	2013.1
+#Version: 	2013.2
 
 #export LC_ALL = your_enviroment
 
-VERSION="2013.1"
+VERSION="2013.2"
 
 `true`
 EXIT_SUCCESS=$?
@@ -17,11 +17,11 @@ ARGC=$#
 
 ##
 #
-# Functions
+#	 Functions
 #	
 ##
 
-function print_help {
+print_help {
 
 	echo " 
 		${SCRIPT_NAME} script for changes owner/group folder
@@ -41,7 +41,7 @@ function print_help {
 "
 }
 
-function enum_error {
+enum_error {
 
         case $1 in
 
@@ -56,7 +56,7 @@ function enum_error {
         return $ret_val
 }
 
-function enum_string {
+enum_string {
 
         case $1 in
 
@@ -72,7 +72,7 @@ function enum_string {
         esac
 }
 
-function check_params {
+check_params {
 
 
 	if [ $help_flag = "on" ] ; then
@@ -110,7 +110,7 @@ function check_params {
 
 }
 
-function default_change_owner {
+default_change_owner {
 
 	for temp in $1 
 	do
@@ -121,7 +121,7 @@ function default_change_owner {
 	done
 }
 
-function find_owner_group {
+find_owner_group {
 
 	maxdepth=1
 	value=`find ${path_value} -maxdepth ${maxdepth}` 
@@ -130,7 +130,7 @@ function find_owner_group {
 	default_change_owner "$without_find_path"
 }
 
-function pathCSV_notspec_read_file {
+pathCSV_notspec_read_file {
 	
 	OLD_IFS=$IFS
 	IFS=,
@@ -144,7 +144,7 @@ function pathCSV_notspec_read_file {
 	IFS=$OLD_IFS
 }
 
-function pathCSV_spec_read_file {
+pathCSV_spec_read_file {
 	
 	OLD_IFS=$IFS
 	IFS=,
