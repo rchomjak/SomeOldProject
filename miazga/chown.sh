@@ -1,4 +1,4 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env sh
 
 #Name:		chown.sh
 #Author: 	knajt, zic.spse(AT)gmail.com
@@ -21,7 +21,7 @@ ARGC=$#
 #	
 ##
 
-print_help {
+function print_help {
 
 	echo " 
 		${SCRIPT_NAME} script for changes owner/group folder
@@ -41,7 +41,7 @@ print_help {
 "
 }
 
-enum_error {
+function enum_error {
 
         case $1 in
 
@@ -56,7 +56,7 @@ enum_error {
         return $ret_val
 }
 
-enum_string {
+function enum_string {
 
         case $1 in
 
@@ -72,7 +72,7 @@ enum_string {
         esac
 }
 
-check_params {
+function check_params {
 
 
 	if [ $help_flag = "on" ] ; then
@@ -110,18 +110,22 @@ check_params {
 
 }
 
-default_change_owner {
+function default_change_owner {
 
 	for temp in $1 
 	do
 		user=`basename "$temp"`
 	  	group=$user	
-	
-		chown -R "${user}:${group}" "${path_value}/${user}"
+
+		grep -q "^${user}:" /etc/passwd && grep -q "^${group}:" /etc/group
+		if [ $? -eq 0 ] ; then 	
+			
+			chown -R "${user}:${group}" "${path_value}/${user}"
+		fi;
 	done
 }
 
-find_owner_group {
+function find_owner_group {
 
 	maxdepth=1
 	value=`find ${path_value} -maxdepth ${maxdepth}` 
@@ -130,29 +134,38 @@ find_owner_group {
 	default_change_owner "$without_find_path"
 }
 
-pathCSV_notspec_read_file {
+function pathCSV_notspec_read_file {
 	
 	OLD_IFS=$IFS
 	IFS=,
 
 	while read user_csv group_csv 
 	do
-		chown -R "${user_csv}:${group_csv}" "${path_value}"
+		grep -q "^${user_csv}:" /etc/passwd && grep -q "^${group_csv}:" /etc/group
+		if [ $? -eq 0 ] ; then 	
+	
+			chown -R "${user_csv}:${group_csv}" "${path_value}"
+		fi;
 
 	done < "$file_path" 
 
 	IFS=$OLD_IFS
 }
 
-pathCSV_spec_read_file {
+function pathCSV_spec_read_file {
 	
 	OLD_IFS=$IFS
 	IFS=,
 
 	while read user_csv group_csv path_csv 
-	do
-		chown -R "${user_csv}:${group_csv}" "${path_csv}"
-
+	do	
+	
+		grep -q "^${user_csv}:" /etc/passwd && grep -q "^${group_csv}:" /etc/group
+		if [ $? -eq 0 ] ; then 	
+		
+			chown -R "${user_csv}:${group_csv}" "${path_csv}"
+		fi;
+	
 	done < "$file_path" 
 
 	IFS=$OLD_IFS
