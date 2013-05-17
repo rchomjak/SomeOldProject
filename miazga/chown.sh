@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-#Name:		chown.sh
-#Author: 	knajt, zic.spse(AT)gmail.com
+#Name:		owner.sh
+#Author: 	knajt, knight(at)wilbury.sk
 #Date: 		2013
 #Version: 	2013.2
 
@@ -49,7 +49,7 @@ function enum_error {
 
                 E_BPAR) ret_val=`expr $EXIT_SUCCESS + 1 `;; #Bad parameters
 
-                E_FILE) ret_val=`expr $EXIT_SUCCESS + 2 `;; #Something wrong with file
+                E_FILE) ret_val=`expr $EXIT_SUCCESS + 2 `;; #File error
 
         esac
 
@@ -68,7 +68,7 @@ function enum_string {
 
                 E_VER) echo "${VERSION}";; 
 
-                E_FILE) echo >&2 "Something is wrong with file.";;
+                E_FILE) echo >&2 "File error.";;
         esac
 }
 
