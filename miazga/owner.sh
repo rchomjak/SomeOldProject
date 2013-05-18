@@ -64,7 +64,7 @@ function enum_string {
 
                 E_PHELP) print_help ;;
 
-                E_BPAR) echo >&2  "Bad parameters.";;
+                E_BPAR) echo >&2  "Bad parameters. Use ${SCRIPT_NAME} -h";;
 
                 E_VER) echo "${VERSION}";; 
 
