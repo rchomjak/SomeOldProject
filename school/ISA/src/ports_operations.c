@@ -63,6 +63,7 @@ ports_push(unsigned short **ports, unsigned short value){
 	return EPOOK;
 }
 
+// Zavrhnute, lunex je zly!
 int
 ports_sort(unsigned short *ports){
 
