@@ -1,5 +1,5 @@
 /**
-@author Richard Chomjak
+@author Knajt
 @file 	file_read_parser.h
 @brief  Parse and controll port range.
 @date 	4/10/2012
