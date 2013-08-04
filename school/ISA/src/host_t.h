@@ -1,5 +1,5 @@
 /**
-@author Richard Chomjak
+@author Knajt
 @file 	host_t.h
 @brief  Operation on host_t.
 @date 	26/9/2012
