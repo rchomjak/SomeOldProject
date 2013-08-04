@@ -1,6 +1,5 @@
-
 /**
-@author Richard Chomjak
+@author knajt
 @file 	errors.h
 @brief  List of errors.
 @date 	26/9/2012
