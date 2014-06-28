@@ -1,0 +1,543 @@
+#!/usr/bin/env ksh
+
+#    NAME: ardiff							    
+#  AUTHOR: Richard CHOMJAK						    
+# CONTACT: knight@fantomas.sk                                              
+#	   DATE: 2011							    
+# About:
+#									    
+# Skript, ktory porovnava dva archivy , na zaklade ich rozdielov, uklada    
+# tieto zmeny do adekvatnej adresovej struktury, tieto rozdiely aplikuje na  
+# jeden z tychto adresarov.					    	    	
+
+function clean_tmp_dir { 
+
+		rm -rf "${TMP_DEST_DIR}.${CURRENT_PROCESS}"  > /dev/null 2>&1 
+}
+
+
+#VYPISANIE NAPOVEDY
+function PrintHelp { 
+echo >&2 "ardiff vypisuje zmeny archivu, vytvari rozdilovy archiv nebo aplikuje rozdilovy
+archiv na zdrojovy archiv.
+Pouziti: ardiff [volby] archiv1 archiv2
+Volby:
+  -o SOUBOR  Pokud je cilem skriptu vytvorit archiv, bude vytvoren do souboru
+             se jmenem SOUBOR (plati pro -c a -p).
+  -l         Vypis seznamu souboru, ktere se v zadanych archivech lisi.
+  -c         Vytvoreni rozdiloveho archivu.
+  -p         Aplikace rozdiloveho archivu (argument archiv2) na zdrojovy archiv
+             (argument archiv1).
+  -r         Prepnuti do reverzniho rezimu (plati pro -p)."
+} 
+
+
+#Testovanie archivu, pomocou grepu
+function test_archive {
+
+#zistenie ci subor [archiv] existuje
+archive="$1"
+if [ ! -f "${archive}" ] ; then
+ 	PrintHelp; exit 1;
+ fi
+#Vytvorenie priecinku na ulozenie temp dat
+mkdir -p "${TMP_DEST_DIR}.${CURRENT_PROCESS}"
+
+#skopirovanie hlavicky, ale neviem ako sa to chova na vsetkych FS, tym padom odignorujem zbytok subora budem mat len hlavicku  s magic number
+dd if="${archive}" of="${TMP_DEST_DIR}.${CURRENT_PROCESS}/infofile" bs=1M count=1 2> /dev/null 1>&2
+		for a in $ARCHIVE_FORMATS ; do 																											#Zistenie formatu
+         file "${TMP_DEST_DIR}.${CURRENT_PROCESS}/infofile" | grep -q "[[:space:]]$a"   #na zaklade grepu [regexp]
+				 if	[ $? -eq 0  ] ; then																												# ak grep nasiel zhodu, tak ulozi format do premenej
+           tested_archive="$a"
+	 fi
+	   done
+		 if [ -z ${tested_archive} ] ; then																								# ak premenna je prazdna, skonci to vypisom help hlasky a exit1
+           PrintHelp; exit 1;
+      fi
+
+	 rm -rf "${TMP_DEST_DIR}.${CURRENT_PROCESS}/infofile"																#upratanie docastneho suboru
+
+	}
+
+#dekompresia na zaklade vystupu z TEST_ARCHIVE
+
+function uncompress_archive {
+
+un_file="$1" #archiv, ktory sa ma rozbalit															
+un_archive="$2" # typ suboru z (fnc) test_archive 
+variable="$3" #kde sa ma rozbalit 
+#Vytvorenie priecinka, v tmp_dir
+mkdir -p "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${variable}"  
+if [ $? -ne 0 ] ; then
+ PrintHelp; exit 1; 
+fi
+case "${un_archive}" in 
+		  			tar) tar -C "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${variable}" -xf "${un_file}"  ;;
+	  			 gzip)tar -C "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${variable}" -xzf "${un_file}"  ;;
+			  	bzip2) tar -C "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${variable}" -xjf "${un_file}"  ;;		
+	 Zip|ZIP| zip) unzip -qq  "${un_file}" -d "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${variable}" ;;
+		*) echo >&2 "Nepodporvany typ archivu";clean_tmp_dir ; exit 1;
+
+esac
+
+if [ $? -ne 0 ] ; then
+
+		PrintHelp;clean_tmp_dir; exit 1;
+
+fi
+} 
+
+#spojenie funkcii
+function test_uncompress_archive {
+
+test_archive "$1" 
+uncompress_archive "$1" ${tested_archive} "$2"
+
+}
+
+
+function find_different {
+
+first_variable="$1"
+second_variable="$2"
+#subory ak by bola chyba [5 centove osetrenie]
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share"
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_all_sort"
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_uniq_change"
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share_change"
+#zistenie vsetkych suborov v zlozkach a vlozenie do jedneho suboru
+
+find -L "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${first_variable}/" -type f   > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share"  	
+find -L "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${second_variable}/" -type f  >> "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share"
+#Test zvlastnych nazvov suborov
+{		while read -r line
+
+do
+if [ ! -f $line ] ; then
+ echo >&2 "Chyba v ceste suboru, alebo v nazve, subor neexistuje"; clean_tmp_dir ; exit 1
+fi
+
+done }  < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share"
+
+
+
+#Zistenie rovnakych a odlisnych suborov
+cat "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share" | sed  "s:${TMP_DEST_DIR}.${CURRENT_PROCESS}/${second_variable}/::g" | sed "s:${TMP_DEST_DIR}.${CURRENT_PROCESS}/${first_variable}/::g" | sort | uniq -u > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_uniq_change"
+cat "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share" | sed  "s:${TMP_DEST_DIR}.${CURRENT_PROCESS}/${second_variable}/::g" | sed "s:${TMP_DEST_DIR}.${CURRENT_PROCESS}/${first_variable}/::g" | sort | uniq -d > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share_change"
+
+#nacitanie po riadku
+{ while read -r a 
+do
+		 diff "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${first_variable}/$a" "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${second_variable}/$a"  > /dev/null
+    if [ $? -eq 1 ] ; then
+			echo $a  >> "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share"
+ fi
+done 
+} < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_share_change"
+#Sort 
+sort "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share" > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_all_sort"
+sort "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_uniq_change" >> "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_all_sort"
+
+}
+
+
+#Parameter-c 
+
+function make_tree {
+
+cd ${TMP_DEST_DIR}.${CURRENT_PROCESS}
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+fi
+
+sort	"${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share"| uniq > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share_sort_directory"
+{ while read -r a ;
+	do
+mkdir -p `dirname c/"${a}"`
+
+done } < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share_sort_directory"
+cd ${START_DIRECTORY}
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+
+}
+
+
+
+
+#porovnanie rovnaky suborov a na zaklade vystupu vlozenie do adresara
+function diff_shared_files {
+
+ cd  "${TMP_DEST_DIR}.${CURRENT_PROCESS}"
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+
+{ while read -r a ;
+do
+		 diff -u -N "${first_variable}/$a" "${second_variable}/$a" > "c/$a.patch"
+ done } < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_share"
+
+cd ${START_DIRECTORY}
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+
+}
+function remove_empty_uniq_files {
+#Zistenie prazdnych suborov.
+#
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem_dem"
+touch "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem"
+	
+    var[0]=${first_variable}
+		var[1]=${second_variable}
+
+		for (( b=0; b<2;b++)) 
+			do
+				 {	while read -r a ;
+					do
+				
+				if [ -f "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${var[${b}]}/$a" ]; then
+					   
+								if [ $b -eq 1 ] ; then
+										var_rem="${second_variable}"
+								else
+										var_rem="${first_variable}"
+							  	fi
+								fi
+						
+						if [ ! -s "${TMP_DEST_DIR}.${CURRENT_PROCESS}/${var_nem}/$a" ]; then
+							echo $a >> "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem_dem"
+					fi
+			done } < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/file_uniq_change"
+ 	done
+
+					sort  "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem_dem" | uniq  >>  "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem"
+}
+
+function parameterC {
+
+
+b=`cat "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem"`
+if [ -s "$b" ] ; then 
+	return 0;
+fi
+#zistenie, ktory subor, kde patri a ci v druhom adresari je ako adresar vice versa.
+
+cd "${TMP_DEST_DIR}.${CURRENT_PROCESS}"
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+
+{ while read -r a ; 
+
+			do
+				slc_dir="off"
+
+				if [ -f "${first_variable}/${a}" ] && [ -d "${second_variable}/${a}" ] ; then
+						slc_dir="${second_variable}"
+			fi 
+		
+				if [ -d "${first_variable}/$a" ] && [ -f "${second_variable}/$a" ] ; then
+					 slc_dir="${first_variable}"
+			fi
+			#Premenovanie adresara ak je zhodny nazov v jednom adresari a v druhom ako subor		
+				if [ ${slc_dir} != "off" ] ; then
+					mv "${slc_dir}/${a}" "tmp_name_dir"
+			fi
+			
+			mkdir -p `dirname c/"${a}"`
+
+ diff -u -N "${first_variable}/${a}" "${second_variable}/${a}" > "c/${a}.patch"
+ 
+#presun adresara a vymazanie, aby sa dalo dalej diffovat [ kvoli rovnakym nazvom]
+		 if [ "${slc_dir}" =  "${second_variable}" ]; then
+ 	 	 			mv "tmp_name_dir" "${slc_dir}/${a}"
+			
+					 rm -rf "${first_variable}/${a}"
+		 elif [ "${slc_dir}" = "${first_variable}" ] ; then 
+				
+ 	 			 mv "tmp_name_dir" "${slc_dir}/${a}"
+				
+				 rm -rf "${second_variable}/${a}"
+ 				fi
+		
+		done } < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_uniq_checked_rem" 
+
+
+cd "${START_DIRECTORY}"
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+#Vymazanie prazdnych adresarov
+find  ${TMP_DEST_DIR}.${CURRENT_PROCESS}/c -type d | xargs   rmdir  2> /dev/null
+ }
+
+
+function parameterP {
+
+first_variable="$1"
+second_variable="$2"
+cd "${TMP_DEST_DIR}.${CURRENT_PROCESS}"
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+fi
+
+# zistenie suborov v diff archive
+find ${second_variable} -type f > "${TMP_DEST_DIR}.${CURRENT_PROCESS}/diff_files"
+	{ while read -r line
+		 do
+		 if [ ! -f $line ] ; then
+		  echo >&2 "Chyba v ceste suboru, alebo v nazve, subor neexistuje"; clean_tmp_dir ; exit 1
+		 fi
+ done }  < "${TMP_DEST_DIR}.${CURRENT_PROCESS}/diff_files"
+
+
+
+if [ $rflag = "on" ] ; then
+
+#reverzny sort pre patch -R
+sort -r "diff_files" > "diff_files_reverse"
+
+{ while read -r a 
+do
+
+mkdir -p "${first_variable}""/"`dirname "${a#*"${second_variable}/"}"`
+ patch -R -E -u -N -f -s  -p0 -i "${a}"  2> /dev/null >&2
+ if [ $? -gt 1 ] ; then
+	 echo >&2 "Chyba Patchu, program bude ukonceny"; clean_tmp_dir; exit 1;
+ fi
+done } < "diff_files_reverse"
+
+
+
+fi
+if [ $rflag = "off" ] ; then
+
+{ while read -r a 
+do 
+		#vytvorenie pozadovaneho priecinku
+
+
+		mkdir -p "${first_variable}""/"`dirname "${a#*"${second_variable}/"}"`
+		 patch -s -u -f -E -p0 -i "${a}"  2> /dev/null >&2 
+		 if [ $? -gt 1 ] ; then
+
+				         echo >&2 "Chyba patchu, program bude ukonceny"; clean_tmp_dir; exit 1;
+
+						 fi
+						                 done } < diff_files
+
+												 fi
+
+find "${second_variable}/" -type d | xargs rmdir 2> /dev/null 
+
+												 cd ${START_DIRECTORY}
+												if [ $? -ne 0 ] ; then
+														echo >&2 "Neocakavana chyba" ; clean_tmp_dit ; exit 1;
+														fi
+
+
+}
+
+#Balenie adresara
+function parameterO {
+cd "${TMP_DEST_DIR}.${CURRENT_PROCESS}"
+if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+fi
+save_file="$1"
+
+for a in ${COMPRESS_FORMAT}  
+do
+		echo "$OARGV" | grep -q ".${a}$" 2> /dev/null 1>&2
+ 		 if [ $? -eq 0 ] ; then
+				compress_format=$a
+		fi
+done
+
+cd "$save_file"
+ if [ $? -ne 0 ] ; then
+
+		 echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1 
+ fi
+		 	case "${compress_format}" in
+		  	tar) tar -pcvf "$OARGV" *  2> /dev/null 1>&2    ;;
+  			tgz) tar -pczvf "$OARGV" * 2> /dev/null 1>&2   ;;
+	 	 tar.gz) tar -pczvf "$OARGV" * 2> /dev/null 1>&2   ;;
+		tar.bz2) tar -pcjvf "$OARGV" * 2> /dev/null 1>&2   ;;
+ZIP|Zip|zip) zip -r "$OARGV" * 2> /dev/null >&2 ;;
+			    * ) echo >&2 "Nepodporovany format, alebo nezadany uplny nazov pozadovaneho suboru [ meno.pripona ]."; clean_tmp_dir ; exit 1  ;
+
+			esac		
+
+cp "$OARGV" "${START_DIRECTORY}"
+rm -rf  "$OARGV"
+	cd "${START_DIRECTORY}"
+	if [ $? -ne 0 ] ; then
+echo >&2 "Neocakavana chyba"; clean_tmp_dir; exit 1;
+
+fi
+
+}
+
+
+trap ' clean_tmp_dir ; exit 1  ' INT HUP TERM #SIGNALY
+ARCHIVE_FORMATS="tar Zip ZIP zip bzip2 gzip" #Premenna na porovnanie typov archivov.
+TMP_DEST_DIR="/tmp/ardiff" 									 #Temporary disk
+COMPRESS_FORMAT="tar  tgz  tar.gz  tar.bz2  zip  Zip  ZIP" #Premenna na zabalenie
+START_DIRECTORY=`pwd`
+CURRENT_PROCESS="$PPID"
+
+#Ak nejaky archiv uz existuje, aby skusil vytvorit ine unikatne cislo
+while [ -e ${TMP_DEST_DIR}.${CURRENT_PROCESS} ]; do
+
+CURRENT_PROCESS=${RANDOM}${RANDOM}${RANDOM}.$PPID
+
+done
+
+#NACITANIE PARAMETROV
+
+cflag="off"
+oflag="off"
+pflag="off"
+rflag="off"
+lflag="off"
+OARGV=""
+
+#Zistenie prazdneho parametra a vypisanie chybovej hlasky
+
+if [ $# -lt 1 ] ; then
+ PrintHelp; exit 1;
+fi
+
+while getopts lprco:  opt
+do
+    case "$opt" in
+      c) if [ $cflag = "on" ] ; then  
+					PrintHelp; exit 1;
+			fi
+					cflag="on" ;;
+      o) if [ $oflag = "on" ] ; then 
+					PrintHelp; exit 1;
+			fi
+					oflag="on";  OARGV="$OPTARG" ;;
+      p) if [ $pflag = "on" ] ;then
+					PrintHelp; exit 1;
+			fi
+			  pflag="on";;
+      r) if [ $rflag = "on" ] ; then 
+					PrintHelp; exit 1;
+			fi
+			 rflag="on";; 
+      l) if [ $lflag = "on" ] ; then 
+					PrintHelp; exit 1;
+			fi
+			   lflag="on";;
+   \?|*)		# neznamy flag
+			 PrintHelp ; exit 1;;
+		esac
+done
+shift `expr $OPTIND - 1`
+if [ $# -eq 2 ] ; then
+
+    ARCHIVE_FIRST=$1
+    ARCHIVE_SECOND=$2
+else
+		PrintHelp; exit 1;
+fi
+#Zaistenie pouzivania pozadovanych flagov
+# ,-l , -c-o, -p-r -o, -p -o , dovolena je akakolvek kombinacia medzi , ,. 
+#Parameter -o potrebuje argument 
+if [ -e "$OARGV" ] ; then 
+
+		echo >&2 "Subor s menom "$OARGV" existuje"; clean_tmp_dir;exit 1
+fi
+
+if [ $lflag = "on" ] ; then
+	
+			if [ $cflag = "on" ] ; then
+			PrintHelp; exit 1;
+	fi
+	
+	if [ $pflag = "on" ] ; then
+			PrintHelp; exit 1;
+	fi
+
+fi
+
+if [ $oflag = "off" ] && [ $lflag = "off" ] ; then
+		PrintHelp; exit 1;
+fi
+
+if [ $cflag = "on" ]; then
+
+		if [ $pflag = "on" ]; then
+		    PrintHelp; exit 1;
+		fi
+
+		if [ $oflag = "off" ] ; then
+				PrintHelp; exit 1;
+		fi
+fi
+
+if [ $pflag = "on" ] ; then
+		
+		if [ $cflag = "on" ] ; then
+				PrintHelp; exit 1;
+		fi
+		if [ $oflag = "off" ] ; then
+			PrintHelp; exit 1;
+		fi
+fi
+
+if [ $rflag = "on" ]; then
+  
+	 if [ $pflag = "off" ] ; then
+			PrintHelp; exit 1;
+	 fi
+fi
+
+
+
+#ParameterL
+if [ $lflag = "on" ]; then 
+	  test_uncompress_archive $ARCHIVE_FIRST a
+	  test_uncompress_archive $ARCHIVE_SECOND b
+	  find_different a b
+ 		sort  "${TMP_DEST_DIR}.${CURRENT_PROCESS}/files_diffed_all_sort"
+		clean_tmp_dir
+		exit 0
+fi
+
+#ParameterC
+if [ $cflag = "on" ]  ; then
+	 test_uncompress_archive $ARCHIVE_FIRST a
+	 test_uncompress_archive $ARCHIVE_SECOND b
+	 find_different a b
+ 	 make_tree
+	 diff_shared_files
+ 	 remove_empty_uniq_files 
+	 parameterC
+	 parameterO c
+	 clean_tmp_dir
+	 exit 0
+fi
+
+#ParameterP
+if [ $pflag = "on" ] ; then
+	 test_uncompress_archive $ARCHIVE_FIRST a 
+	 test_uncompress_archive $ARCHIVE_SECOND diff_FILES 
+	 parameterP a diff_FILES
+	 parameterO a 
+	 clean_tmp_dir
+	 exit 0
+fi
+	 

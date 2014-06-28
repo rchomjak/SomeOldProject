@@ -1,0 +1,119 @@
+#!/usr/bin/env ksh
+#   AUTOR: Richard Chomjak
+# CONTACT: knight@fantomas.sk
+# 	 DATE: 2011
+
+
+
+export LC_ALL=C
+#IFS="$(printf "\n")"
+
+##################################################
+function PrintHelp {
+echo "hltrace zvyrazni syntax stopy od strace.
+Pouziti: hltrace [volby] <stopa.strace >stopa.html
+Volby:
+  -s SYSCALL  Specialne zvyrazni volani SYSCALL."
+}
+#HEADER
+function header {
+echo "<html>
+<style>
+.pid { color:darkred; }
+.ts { color:navy; }
+.number { color:red; }
+.const { color:green; }
+.string { color:blue; }
+.hlcall { text-decoration:none; font-weight:bold; color:black; }
+.call { text-decoration:none; color:olive; }
+</style>
+<body><pre>"
+}
+
+#TRAIL
+function trail {
+echo "</pre></body></html>"
+}
+
+#NACITANIE FLAGOV
+
+hflag="off"
+sflag="off"
+SOARGV=""
+
+while getopts s:h  opt
+		 do
+		     case "$opt" in
+			 	 h) hflag="on" ;; 
+	   		 s) if [ "$sflag" = "on" ] ; then
+				PrintHelp; exit 1;
+				    fi
+		  		sflag="on";SOARGV=$OPTARG ;;
+    		*\?)PrintHelp;exit 1;;
+		esac
+ done
+ shift `expr $OPTIND - 1`
+
+
+if [ "$sflag" = "on" ] ; then 
+if [ "$hflag" = "on" ] ; then
+PrintHelp; exit 1
+fi
+fi
+# hlavicka
+header
+
+ while read -r riadok
+
+do
+ 		syscall=$( printf '%s' "$riadok" | sed '
+		
+		s/[&]/\&amp;/g 
+		s/[<]/\&lt;/g  
+		s/[>]/\&gt;/g 
+
+
+		s/\("[^"]*"\)/\<span class="string"\>\1\<\/span\>/g 
+
+
+		s/^\([0-9][0-9]*\)/\<span class="pid"\>\1\<\/span\>/
+		s/\([:space:]*\)\([0-9][0-9]*\.[0-9][0-9]*\)\([[:space:]][^0-9]\)/\1\<span class="ts"\>\2\<\/span\>\3/g 
+	 
+
+		s/\([[(,[:space:]]\)\(0x[0-9a-f]*\)\([),[:space:]]*\)/\1\<span class="number"\>\2\<\/span\>\3/g 
+		
+		s/\((\)\([-]*[0-9][0-9]*\)\([),]\)/\1\<span class="number"\>\2\<\/span\>\3/g 
+		s/\([[:space:]][=][[:space:]]\)\([-]*[0-9][0-9]*\)/\1\<span class="number"\>\2\<\/span\>/g  
+		s/\([,][[:space:]]\)\([0-9][0-9]*\)\([)]\)/\1\<span class="number"\>\2\<\/span\>\3/g
+		s/\([,][[:space:]]\)\([-]*[0-9][0-9]*\)\([,]\)/\1\<span class="number"\>\2\<\/span\>\3/g  
+
+
+		s/\([([,=|]\)\([A-Z][A-Z_0-9_][A-Z_0-9]*\)/\1\<span class="const"\>\2\<\/span\>/g 
+		s/\([[:space:]]\)\([A-Z][A-Z_0-9_][A-Z_0-9]*\)/\1\<span class="const"\>\2\<\/span\>/g
+		s/\([({\]\)\([A-Z][A-Z_0-9_][A-Z_0-9]*\)/\1\<span class="const"\>\2\<\/span\>/g')	
+
+	
+
+
+if [ $sflag = "on" ] ; then 
+ 
+    printf '"%s"' "${syscall}" | grep -q "${SOARGV}" 2> /dev/null 1>&2
+if [ $? -eq 0 ] ; then
+  echo ${syscall} | sed 's/'"$SOARGV"'(/\<a href="http:\/\/www\.kernel\.org\/doc\/man-pages\/online\/pages\/man2\/'"$SOARGV"'\.2\.html" class="hlcall"\>\'"$SOARGV"'\<\/a\>(/'  
+else 
+
+  echo "${syscall}" | sed 's/\([a-z][a-z_0-9]*\)(/\<a href="http:\/\/www\.kernel\.org\/doc\/man-pages\/online\/pages\/man2\/\1\.2\.html" class="call"\>\1\<\/a\>(/' 
+
+fi
+else  echo "${syscall}" | sed 's/\([a-z][a-z_0-9]*\)(/\<a href="http:\/\/www\.kernel\.org\/doc\/man-pages\/online\/pages\/man2\/\1\.2\.html" class="call"\>\1\<\/a\>(/'
+
+fi
+
+
+
+done 
+
+
+# zahlavie
+trail
+
