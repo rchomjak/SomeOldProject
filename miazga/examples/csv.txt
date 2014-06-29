@@ -1,2 +1,0 @@
-user,group
-user2,group2
