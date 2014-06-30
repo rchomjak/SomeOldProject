@@ -1,4 +1,4 @@
-Purpose of this project is create tetris game in uCU MC9S08JM60.
+Purpose of this project is create tetris game on uCU MC9S08JM60.
 
 source codes of program are in "Tetris/Sources"
 
