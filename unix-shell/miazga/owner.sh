@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 
 #Name:		owner.sh
-#Author: 	knajt, knight(at)wilbury.sk
 #Date: 		2013
 #Version: 	2013.2
 
