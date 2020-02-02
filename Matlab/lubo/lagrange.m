@@ -1,5 +1,3 @@
-
-% Author: knajt, knight(at)wilbury.sk 
 % Date:  2011 
 % example: lagrange([-1,1,2,3],[-6,-2,-3,2])
 
